@@ -183,11 +183,15 @@ const T = {
   rain: 5.45,                    // сцена с дождём
   dive2: [5.75, 6.55],           // пике на полной скорости
   impact: 6.55,                  // врезается в воду
-  rise: [8.3, 9.9],              // из-под воды всплывает кораблик
-  hand: 9.95,                    // передача настоящей сцене
-  end: 10.5,
+  rise: [8.3, 10.3],             // из-под воды всплывает кораблик
+  hand: 10.35,                   // передача настоящей сцене
+  end: 10.9,
 };
-T.breach = T.rise[0] + 0.42 * (T.rise[1] - T.rise[0]);   // кораблик пробивает поверхность
+// всплытие — затухающее колебание от глубины 1 до посадки 0: трогается плавно, проскакивает уровень на 3%
+// (3 см) и оседает; к концу точно 0, чтобы стыковаться с настоящей сценой
+const riseF = u => Math.exp(-5.3 * u) * (Math.cos(4.75 * u) + 1.115 * Math.sin(4.75 * u)) * (1 - sm(0.8, 1, u));
+// борт (на плаву 0.34 над водой, глубина 1.1) выходит из воды при riseF = 0.31, это u = 0.276
+T.breach = T.rise[0] + 0.276 * (T.rise[1] - T.rise[0]);
 
 /* ---------------- Ники ---------------- */
 const F = { PAC: '"Pacifico"', CAV: '600 "Caveat"', MARCK: '"Marck Script"', AMA: '700 "Amatic SC"' };
@@ -1496,7 +1500,8 @@ const ghostPlane = new THREE.Group();
 ghostPlane.add(new THREE.Mesh(wingGeo, ghostMat), new THREE.Mesh(keelGeo, ghostMat));
 const ghostBoat = new THREE.Mesh(boatGeo, ghostBoatMat);
 for (const o of [reflPlane, reflBoat, ghostPlane, ghostBoat]) { o.matrixAutoUpdate = false; o.frustumCulled = false; o.traverse(m => { m.renderOrder = -3; m.frustumCulled = false; }); rain.add(o); }
-const rings = Array.from({ length: 6 }, () => {
+ghostBoat.matrix.makeScale(1, 0.75, 1);   // преломление: под водой всё кажется ближе к поверхности
+const rings = Array.from({ length: 7 }, () => {
   const m = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xc8c0ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
   m.position.y = 0.004; rain.add(m); return m;
@@ -1528,7 +1533,6 @@ function prepBoat(st) {
   cv.getContext('2d').drawImage(b.paper, 0, 0);
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex.anisotropy = maxAniso;
   boatMat.map = tex; boatMat.needsUpdate = true;
-  ghostBoatMat.map = tex; ghostBoatMat.needsUpdate = true;
   boatGeo.attributes.uv.array.set(st.uv); boatGeo.attributes.uv.needsUpdate = true;
   boatReady = true;
 }
@@ -1618,10 +1622,9 @@ function rainFrame(dt) {
   // кораблик поднимается из глубины
   if (boatReady) {
     const u = clamp((s - T.rise[0]) / (T.rise[1] - T.rise[0]), 0, 1);
-    const v = sm(0, 1, u), c1 = 1.5, back = 1 + (c1 + 1) * Math.pow(v - 1, 3) + c1 * Math.pow(v - 1, 2);   // плавный подъём, чуть выскакивает и оседает
-    const yoff = -1.1 * (1 - back), tilt = 0.18 * (1 - back);
+    const f = riseF(u), yoff = -1.1 * f, tilt = 0.18 * f;
     const tri = st.tri, Pb = boatGeo.attributes.position.array;
-    let cx = 0; for (let k = 0; k < 39; k++) cx += tri[k * 3] / 39;
+    let cx = 0, top = 1; for (let k = 0; k < 39; k++) { cx += tri[k * 3] / 39; if (tri[k * 3 + 1] > tri[top * 3 + 1]) top = k; }
     for (let k = 0; k < 39; k++) {
       Pb[k * 3] = tri[k * 3]; Pb[k * 3 + 2] = tri[k * 3 + 2];
       Pb[k * 3 + 1] = tri[k * 3 + 1] + yoff + (tri[k * 3] - cx) * tilt;
@@ -1629,10 +1632,10 @@ function rainFrame(dt) {
     boatGeo.attributes.position.needsUpdate = true; boatGeo.computeVertexNormals(); boatGeo.computeBoundingSphere();
     boatMesh.visible = s >= T.rise[0];
     ghostBoat.visible = boatMesh.visible;
-    ghostBoatMat.opacity = 0.32 * sm(T.rise[0], T.rise[0] + 0.6, s) * (1 - sm(T.rise[0] + 0.8, T.rise[1] - 0.2, s));
-    // прорыв поверхности: кольца и стекающая с бумаги вода
+    ghostBoatMat.opacity = 0.035 * sm(T.rise[0], T.rise[0] + 0.3, s) * (1 - sm(T.breach, T.breach + 0.5, s));
+    // парус прорезает воду, затем прорыв поверхности: кольца и стекающая с бумаги вода
     const tBreach = T.breach;
-    ringAt.push([tBreach, cx, 0, 1.3], [tBreach + 0.35, cx, 0, 0.9]);
+    ringAt.push([T.rise[0] + 0.05, tri[top * 3], tri[top * 3 + 2], 0.5], [tBreach, cx, 0, 1.3], [tBreach + 0.35, cx, 0, 0.9]);
     const tb = s - tBreach;
     if (tb > 0 && tb < 2) {
       for (let k = 0; k < 140; k++) {
