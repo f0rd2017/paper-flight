@@ -1579,7 +1579,8 @@ function rainFrame(dt) {
   planeMats.forEach(m => m.color.copy(white).lerp(paperWet, wet));
   for (let i = 0; i < CREW.length; i++) glow[i] = 0.5 * sm(tI, tI + 0.2, s) * (1 - sm(tI + 0.6, tI + 1.5, s));
   ghostMat.opacity = 0.14 * sm(tI, tI + 0.05, s) * (1 - sm(tI + 0.5, tI + 1.5, s));
-  ghostPlane.matrix.makeScale(1, 0.75, 1).multiply(plane.matrixWorld); ghostPlane.matrixWorldNeedsUpdate = true;   // преломление, как у кораблика ghostPlane.visible = plane.visible;
+  // преломление: под водой всё кажется ближе к поверхности
+  ghostPlane.matrix.makeScale(1, 0.75, 1).multiply(plane.matrixWorld); ghostPlane.matrixWorldNeedsUpdate = true; ghostPlane.visible = plane.visible;
   // удар: вспышка, корона брызг, столб воды, водяная пыль, встряска экрана
   const ti = s - tI;
   if (ti > 0 && ti < 1.6) {
