@@ -1725,7 +1725,7 @@ function loopBounds(b) {
 // ник ложится на крыло — нота калимбы (запись — до первой октавы, MIDI 60.17); мелодия в ля-минорной
 // пентатонике под фоновую музыку (ля минор), Betelgeuse закрывает её аккордом
 const MELODY = [69, 72, 76, 74, 72, 69, 72, 74, 76, 79, 76, 79, 81, 79, [69, 76, 81]];
-const VOLUME = 0.4;     // общая громкость: ~−25 LUFS, фон, а не видео
+const VOLUME = 0.22;    // общая громкость: ~−30 LUFS, тихий фон
 let ac = null, master = null, bus = null, loops = null, sndDone = 0;
 let soundOn = true;
 try { soundOn = localStorage.getItem('pf-sound') !== 'off'; } catch {}
@@ -1760,31 +1760,31 @@ function chime(i, side, at) {
 const SND_EVENTS = [
   ...CREW.map((c, i) => [T.name(i) - 0.35, at => playBuf('paper', at, { vol: 0.2, rate: 0.9 + 0.3 * hash2(i, 31), pan: c.side * 0.6 })]),
   ...CREW.map((c, i) => [T.name(i) + 0.25, at => chime(i, c.side, at)]),
-  [T.dive[0], at => playBuf('whoosh', at, { vol: 0.42, rate: 0.75 })],
-  [T.dive2[0], at => playBuf('whoosh', at, { vol: 0.53 })],
+  [T.dive[0], at => playBuf('whoosh', at, { vol: 0.21, rate: 0.75 })],
+  [T.dive2[0], at => playBuf('whoosh', at, { vol: 0.27 })],
   [T.impact, at => {
     playBuf('splash', at, { vol: 0.9 });
-    playBuf('drop', at + 0.35, { vol: 0.35, rate: 0.8, pan: -0.2 });
+    playBuf('drop', at + 0.35, { vol: 0.18, rate: 0.8, pan: -0.2 });
     loops.music.g.gain.setTargetAtTime(0.22, at, 0.04);           // музыка проседает под удар и возвращается
     loops.music.g.gain.setTargetAtTime(0.5, at + 0.9, 0.9);
   }],
   [T.breach, at => {
-    playBuf('drop', at, { vol: 0.5, rate: 1.2 });
-    for (let k = 0; k < 7; k++) playBuf('drip', at + 0.2 + k * 0.21 + 0.12 * hash2(k, 41), { vol: 0.12 + 0.16 * hash2(k, 43), rate: 0.8 + 0.6 * hash2(k, 47), pan: (hash2(k, 53) - 0.5) * 0.6 });
+    playBuf('drop', at, { vol: 0.25, rate: 1.2 });
+    for (let k = 0; k < 7; k++) playBuf('drip', at + 0.2 + k * 0.21 + 0.12 * hash2(k, 41), { vol: 0.06 + 0.08 * hash2(k, 43), rate: 0.8 + 0.6 * hash2(k, 47), pan: (hash2(k, 53) - 0.5) * 0.6 });
   }],
 ].sort((a, b) => a[0] - b[0]);
 
 function soundBegin(at) {
   loops = { music: loopBuf('music', bus.music, at), wind: loopBuf('wind', bus.amb, at), rain: loopBuf('rain', bus.amb, at) };
   loops.music.g.gain.setTargetAtTime(0.5, at, 1.0);
-  playBuf('whoosh', at, { vol: 0.35, rate: 1.25, pan: 0.4 });     // бросок самолётика
+  playBuf('whoosh', at, { vol: 0.18, rate: 1.25, pan: 0.4 });     // бросок самолётика
 }
 function soundFrame(sv, sky, now) {
   if (sv - sndDone > 0.5) sndDone = sv;      // прыжок по сценарию (?seek, свёрнутая вкладка): пропущенное не играем
   for (const [t, fn] of SND_EVENTS) if (t > sndDone && t <= sv + 0.05) fn(now + Math.max(0, t - sv));
   sndDone = sv + 0.05;
   const k = clamp((speedRun(sv) - 6) / 21, 0, 1);     // ветер — за скоростью полёта
-  loops.wind.g.gain.setTargetAtTime(sky ? 0.22 + 0.42 * k : 0, now, sky ? 0.2 : 0.08);
+  loops.wind.g.gain.setTargetAtTime(sky ? 0.16 + 0.3 * k : 0, now, sky ? 0.2 : 0.08);
   loops.wind.src.playbackRate.setTargetAtTime(0.85 + 0.4 * k, now, 0.3);
   loops.rain.g.gain.setTargetAtTime(sv >= T.rain ? 0.55 : 0, now, 0.15);
 }
